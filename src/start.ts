@@ -61,6 +61,19 @@ export async function runServer(options: RunServerOptions): Promise<void> {
   await setupCopilotToken()
   await cacheModels()
 
+  // Initial fetch of usage information for premium interactions tracking
+  const { forceRefreshUsage, getCurrentUsagePercent } = await import(
+    "./lib/refresh-usage"
+  )
+  await forceRefreshUsage()
+
+  const usagePercent = getCurrentUsagePercent()
+  if (usagePercent !== null && state.premiumInteractions) {
+    consola.info(
+      `Premium interactions usage: ${usagePercent.toFixed(1)}% (${state.premiumInteractions.remaining}/${state.premiumInteractions.entitlement} remaining)`,
+    )
+  }
+
   // consola.info(
   //   `Full Model Info:\n${
   //     state.models?.data

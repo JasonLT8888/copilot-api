@@ -1,11 +1,54 @@
 import consola from "consola"
 
+import modelConsumptionData from "./model-consumption.json"
 import { state } from "./state"
+
+/**
+ * Get model consumption value
+ */
+function getModelConsumption(modelName: string): number {
+  const consumptionMap = new Map(
+    modelConsumptionData.models.map((m) => [m.name, m.consumption]),
+  )
+  const consumption = consumptionMap.get(modelName) || "N/A"
+
+  if (consumption === "N/A") return 999
+  const match = consumption.match(/^([\d.]+)x$/)
+  return match ? Number.parseFloat(match[1]) : 999
+}
+
+/**
+ * Check if premium interactions usage is high (>50%)
+ */
+function isPremiumUsageHigh(): boolean {
+  if (!state.premiumInteractions) {
+    return false
+  }
+
+  const usagePercent = 100 - state.premiumInteractions.percent_remaining
+  return usagePercent > 50
+}
+
+/**
+ * Get all 0x consumption models
+ */
+function getZeroConsumptionModels(): string[] {
+  const availableModels = state.models?.data.filter(
+    (m) => typeof m.capabilities?.limits?.max_context_window_tokens === "number",
+  )
+
+  if (!availableModels) return []
+
+  return availableModels
+    .filter((m) => getModelConsumption(m.name) === 0)
+    .map((m) => m.id)
+}
 
 /**
  * Find a matching model from available models
  * If exact match exists, return it
  * If no exact match, try to find by prefix (e.g., claude-haiku-4-5-xxx -> claude-haiku-4.5)
+ * If premium usage >50%, only match to 0x consumption models
  */
 export function findMatchingModel(requestedModel: string): string | null {
   const availableModels = state.models?.data.filter(
@@ -16,14 +59,32 @@ export function findMatchingModel(requestedModel: string): string | null {
     return null
   }
 
-  const availableModelIds = availableModels.map((m) => m.id)
+  const highUsage = isPremiumUsageHigh()
+  const zeroConsumptionModels = highUsage ? getZeroConsumptionModels() : []
+  const allAvailableModelIds = availableModels.map((m) => m.id)
 
   consola.debug(`Looking for match for: ${requestedModel}`)
-  consola.debug(`Available models: ${availableModelIds.join(", ")}`)
+  consola.debug(`All available models: ${allAvailableModelIds.join(", ")}`)
 
-  // Try exact match first
-  if (availableModelIds.includes(requestedModel)) {
+  // Try exact match first (always allow exact match, even if high usage)
+  if (allAvailableModelIds.includes(requestedModel)) {
+    // If high usage and model is not 0x, warn but still allow
+    if (highUsage && !zeroConsumptionModels.includes(requestedModel)) {
+      consola.warn(
+        `⚠️  Premium usage >50%, but exact match found: ${requestedModel}`,
+      )
+    }
     return requestedModel
+  }
+
+  // For fuzzy matching when usage is high, only consider 0x models
+  let availableModelIds = allAvailableModelIds
+  if (highUsage && zeroConsumptionModels.length > 0) {
+    consola.info(
+      `⚠️  Premium usage >50%, restricting fuzzy matching to 0x consumption models`,
+    )
+    availableModelIds = zeroConsumptionModels
+    consola.debug(`0x models for matching: ${availableModelIds.join(", ")}`)
   }
 
   // Normalize the requested model
@@ -82,6 +143,14 @@ export function findMatchingModel(requestedModel: string): string | null {
         return availableId
       }
     }
+  }
+
+  // Fallback: if high usage and no match found, use first 0x model
+  if (highUsage && zeroConsumptionModels.length > 0) {
+    consola.warn(
+      `⚠️  No matching 0x model found, falling back to: ${zeroConsumptionModels[0]}`,
+    )
+    return zeroConsumptionModels[0]
   }
 
   consola.debug(`No match found for: ${requestedModel}`)

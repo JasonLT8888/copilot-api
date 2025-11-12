@@ -6,6 +6,7 @@ import { streamSSE, type SSEMessage } from "hono/streaming"
 import { awaitApproval } from "~/lib/approval"
 import { validateAndReplaceModel } from "~/lib/model-matcher"
 import { checkRateLimit } from "~/lib/rate-limit"
+import { refreshUsage } from "~/lib/refresh-usage"
 import { state } from "~/lib/state"
 import { getTokenCount } from "~/lib/tokenizer"
 import { isNullish } from "~/lib/utils"
@@ -16,6 +17,9 @@ import {
 } from "~/services/copilot/create-chat-completions"
 
 export async function handleCompletion(c: Context) {
+  // Refresh usage information before processing request
+  await refreshUsage()
+
   await checkRateLimit(state)
 
   let payload = await c.req.json<ChatCompletionsPayload>()
