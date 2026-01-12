@@ -17,6 +17,10 @@
 {"name": "Raptor mini (Preview)", "consumption": "0x"},
 {"name": "GPT-5.1-Codex-Max (Preview)", "consumption": "1x"},
 {"name": "Claude Opus 4.5 (Preview)", "consumption": "1x"},
-{"name": "GPT-5.2 (Preview)", "consumption": "1x"}
+{"name": "GPT-5.2 (Preview)", "consumption": "1x"},
+{"name": "GPT-5.1-Codex-Max", "consumption": "1x"},
+{"name": "Claude Opus 4.5", "consumption": "3x"},
+{"name": "Gemini 3 Flash (Preview)", "consumption": "1x"},
+{"name": "GPT-5.2", "consumption": "1x"}
 ]
 }
